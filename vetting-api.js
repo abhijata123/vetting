@@ -66,17 +66,47 @@ app.get('/health', (req, res) => {
 
 app.post('/api/vetting-table/initialize', async (req, res) => {
   try {
+    // Check environment variables
     const PACKAGE_ID = process.env.PACKAGE_ID;
+    const MASTER_MNEMONIC = process.env.MASTER_MNEMONIC;
+    
     if (!PACKAGE_ID) {
+      console.error('PACKAGE_ID is not set in environment variables');
       return res.status(500).json({ 
         success: false, 
-        error: 'PACKAGE_ID environment variable is not set' 
+        error: 'PACKAGE_ID environment variable is not set',
+        envCheck: {
+          PACKAGE_ID: !!PACKAGE_ID,
+          MASTER_MNEMONIC: !!MASTER_MNEMONIC,
+          SUI_RPC_URL: !!process.env.SUI_RPC_URL
+        }
       });
     }
+
+    if (!MASTER_MNEMONIC) {
+      console.error('MASTER_MNEMONIC is not set in environment variables');
+      return res.status(500).json({ 
+        success: false, 
+        error: 'MASTER_MNEMONIC environment variable is not set',
+        envCheck: {
+          PACKAGE_ID: !!PACKAGE_ID,
+          MASTER_MNEMONIC: !!MASTER_MNEMONIC,
+          SUI_RPC_URL: !!process.env.SUI_RPC_URL
+        }
+      });
+    }
+
+    console.log('Environment check passed:', {
+      PACKAGE_ID: PACKAGE_ID.substring(0, 10) + '...',
+      MASTER_MNEMONIC_SET: !!MASTER_MNEMONIC,
+      SUI_RPC_URL: process.env.SUI_RPC_URL || 'using default'
+    });
 
     const keypair = getMasterKeypair();
     const organizationId = generateOrganizationId();
     const creatorAddress = keypair.getPublicKey().toSuiAddress();
+
+    console.log('Creating transaction for address:', creatorAddress);
 
     const tx = new TransactionBlock();
 
@@ -85,6 +115,8 @@ app.post('/api/vetting-table/initialize', async (req, res) => {
       target: `${PACKAGE_ID}::vetting::initialize_vetting_table`,
       arguments: [],
     });
+
+    console.log('Signing and executing transaction...');
 
     // Sign and execute transaction with Node.js 16 compatible options
     const result = await suiClient.signAndExecuteTransactionBlock({
@@ -97,6 +129,9 @@ app.post('/api/vetting-table/initialize', async (req, res) => {
       },
     });
 
+    console.log('Transaction executed:', result.digest);
+    console.log('Object changes:', JSON.stringify(result.objectChanges, null, 2));
+
     // Find the created VettingTable object
     let vettingTableId = null;
     if (result.objectChanges) {
@@ -106,6 +141,7 @@ app.post('/api/vetting-table/initialize', async (req, res) => {
                    change.objectType.includes('VettingTable')
       );
       vettingTableId = vettingTableChange?.objectId;
+      console.log('Found vetting table ID:', vettingTableId);
     }
 
     if (!vettingTableId) {
@@ -114,7 +150,11 @@ app.post('/api/vetting-table/initialize', async (req, res) => {
         success: false, 
         error: 'VettingTable object not found in transaction results',
         transactionDigest: result.digest,
-        objectChanges: result.objectChanges
+        objectChanges: result.objectChanges,
+        debug: {
+          hasObjectChanges: !!result.objectChanges,
+          objectChangesCount: result.objectChanges ? result.objectChanges.length : 0
+        }
       });
     }
 
@@ -133,13 +173,23 @@ app.post('/api/vetting-table/initialize', async (req, res) => {
 
   } catch (error) {
     console.error('Error initializing vetting table:', error);
+    console.error('Error stack:', error.stack);
     
     // More detailed error handling for debugging
     const errorMessage = error.message || 'Failed to initialize vetting table';
     const errorDetails = {
       success: false,
       error: errorMessage,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      debug: {
+        errorName: error.name,
+        errorCode: error.code,
+        envVarsSet: {
+          PACKAGE_ID: !!process.env.PACKAGE_ID,
+          MASTER_MNEMONIC: !!process.env.MASTER_MNEMONIC,
+          SUI_RPC_URL: !!process.env.SUI_RPC_URL
+        }
+      }
     };
 
     // Add more context if it's a Sui-specific error
@@ -167,16 +217,27 @@ app.get('/api/vetting-table/:tableId', async (req, res) => {
       });
     }
 
+    // Validate Sui object ID format (should be 0x followed by 64 hex characters)
+    const suiObjectIdRegex = /^0x[a-fA-F0-9]{64}$/;
+    if (!suiObjectIdRegex.test(tableId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid Sui Object ID format. Must be 0x followed by 64 hex characters',
+        providedId: tableId
+      });
+    }
+
     // Get the vetting table object
     const vettingTable = await suiClient.getObject({
       id: tableId,
-      options: { showContent: true }
+      options: { showContent: true, showType: true }
     });
 
     if (!vettingTable.data) {
       return res.status(404).json({
         success: false,
-        error: 'Vetting table not found'
+        error: 'Vetting table not found',
+        tableId: tableId
       });
     }
 
@@ -193,7 +254,8 @@ app.get('/api/vetting-table/:tableId', async (req, res) => {
     console.error('Error fetching vetting table:', error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Failed to fetch vetting table'
+      error: error.message || 'Failed to fetch vetting table',
+      tableId: req.params.tableId
     });
   }
 });
