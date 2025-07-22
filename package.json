@@ -1,0 +1,26 @@
+{
+  "name": "vetting-table-api",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Sui blockchain vetting table API for Braav organization",
+  "main": "vetting-api.js",
+  "scripts": {
+    "start": "node vetting-api.js",
+    "dev": "nodemon vetting-api.js"
+  },
+  
+    "dependencies": {
+      "@mysten/sui.js": "^0.54.1",
+      "express": "^4.18.0",
+      "cors": "^2.8.5",
+      "dotenv": "^16.0.0",
+      "node-fetch": "^3.3.0"
+    }
+  ,
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
