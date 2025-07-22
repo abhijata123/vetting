@@ -210,6 +210,15 @@ app.get('/api/vetting-table/:tableId', async (req, res) => {
   try {
     const { tableId } = req.params;
     
+    // Prevent confusion with the initialize endpoint
+    if (tableId === 'initialize') {
+      return res.status(400).json({
+        success: false,
+        error: 'To initialize a vetting table, use POST /api/vetting-table/initialize',
+        hint: 'This endpoint is for getting existing tables. Use a valid Sui object ID.'
+      });
+    }
+    
     if (!tableId) {
       return res.status(400).json({
         success: false,
@@ -223,7 +232,8 @@ app.get('/api/vetting-table/:tableId', async (req, res) => {
       return res.status(400).json({
         success: false,
         error: 'Invalid Sui Object ID format. Must be 0x followed by 64 hex characters',
-        providedId: tableId
+        providedId: tableId,
+        example: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       });
     }
 
