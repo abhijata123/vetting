@@ -64,6 +64,7 @@ app.get('/health', (req, res) => {
   });
 });
 
+// IMPORTANT: Put the initialize POST route BEFORE the generic GET route
 app.post('/api/vetting-table/initialize', async (req, res) => {
   try {
     // Check environment variables
@@ -205,7 +206,7 @@ app.post('/api/vetting-table/initialize', async (req, res) => {
   }
 });
 
-// Add additional endpoints for completeness
+// PUT the GET route AFTER the POST initialize route to avoid conflicts
 app.get('/api/vetting-table/:tableId', async (req, res) => {
   try {
     const { tableId } = req.params;
