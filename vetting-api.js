@@ -211,6 +211,8 @@ app.get('/api/vetting-table/:tableId', async (req, res) => {
   try {
     const { tableId } = req.params;
     
+    console.log('GET request for table ID:', tableId);
+    
     // Prevent confusion with the initialize endpoint
     if (tableId === 'initialize') {
       return res.status(400).json({
@@ -230,6 +232,7 @@ app.get('/api/vetting-table/:tableId', async (req, res) => {
     // Validate Sui object ID format (should be 0x followed by 64 hex characters)
     const suiObjectIdRegex = /^0x[a-fA-F0-9]{64}$/;
     if (!suiObjectIdRegex.test(tableId)) {
+      console.log('Invalid Sui Object ID format:', tableId);
       return res.status(400).json({
         success: false,
         error: 'Invalid Sui Object ID format. Must be 0x followed by 64 hex characters',
@@ -238,11 +241,28 @@ app.get('/api/vetting-table/:tableId', async (req, res) => {
       });
     }
 
+    console.log('Fetching object from Sui network:', tableId);
+
     // Get the vetting table object
     const vettingTable = await suiClient.getObject({
       id: tableId,
       options: { showContent: true, showType: true }
     });
+
+    console.log('Sui response received:', {
+      hasData: !!vettingTable.data,
+      error: vettingTable.error
+    });
+
+    if (vettingTable.error) {
+      console.error('Sui client error:', vettingTable.error);
+      return res.status(400).json({
+        success: false,
+        error: 'Error from Sui network: ' + vettingTable.error.code,
+        details: vettingTable.error,
+        tableId: tableId
+      });
+    }
 
     if (!vettingTable.data) {
       return res.status(404).json({
@@ -263,10 +283,21 @@ app.get('/api/vetting-table/:tableId', async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching vetting table:', error);
+    console.error('Table ID that caused error:', req.params.tableId);
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      code: error.code
+    });
+    
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch vetting table',
-      tableId: req.params.tableId
+      tableId: req.params.tableId,
+      debug: {
+        errorType: error.name,
+        timestamp: new Date().toISOString()
+      }
     });
   }
 });
